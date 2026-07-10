@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: .
+    env_file: .env
+    environment:
+      - DB_PATH=/app/db/enjazi.db
+    volumes:
+      - db_data:/app/db
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://backendinjzi.alwahyain.org
+    environment:
+      - NEXT_PUBLIC_API_URL=https://backendinjzi.alwahyain.org
+    depends_on:
+      - backend
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+
+networks:
+  dokploy-network:
+    external: true

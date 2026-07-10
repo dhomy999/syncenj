@@ -1,0 +1,432 @@
+@import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Warm parchment palette ── */
+  --bg:          oklch(0.965 0.012 80);
+  --bg2:         oklch(0.94 0.016 78);
+  --card:        oklch(0.995 0.003 90);
+  --card-border: oklch(0.88 0.025 75 / 0.55);
+  --card-shadow: oklch(0.70 0.03 70 / 0.10);
+
+  /* ── Accent: honey gold ── */
+  --gold:        oklch(0.58 0.145 65);
+  --gold2:       oklch(0.52 0.15 58);
+  --gold-soft:   oklch(0.58 0.145 65 / 0.10);
+  --gold-glow:   oklch(0.72 0.12 70 / 0.25);
+
+  /* ── Semantic greens — sage/teal ── */
+  --jade:        oklch(0.52 0.11 162);
+  --jade-soft:   oklch(0.52 0.11 162 / 0.09);
+
+  /* ── Warm apricot ── */
+  --amber:       oklch(0.62 0.14 55);
+  --amber-soft:  oklch(0.62 0.14 55 / 0.09);
+
+  /* ── Soft coral ── */
+  --rose:        oklch(0.55 0.13 18);
+  --rose-soft:   oklch(0.55 0.13 18 / 0.08);
+
+  /* ── Text: warm browns ── */
+  --cream:       oklch(0.96 0.012 82);
+  --text:        oklch(0.22 0.025 55);
+  --text-muted:  oklch(0.48 0.02 60);
+  --text-dim:    oklch(0.64 0.015 70);
+
+  --radius:      18px;
+  --radius-sm:   11px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  min-height: 100vh;
+  direction: rtl;
+}
+
+/* Warm atmospheric background — soft light washes */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%,   oklch(0.92 0.035 75 / 0.50), transparent),
+    radial-gradient(ellipse 55% 40% at 8% 90%,    oklch(0.90 0.04 162 / 0.15), transparent),
+    radial-gradient(ellipse 50% 35% at 92% 55%,   oklch(0.93 0.03 55  / 0.18), transparent);
+  pointer-events: none;
+}
+
+/* Arabesque SVG tile — very subtle on light bg */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23a0845020' stroke-width='0.6'%3E%3Cpolygon points='40,6 46,28 68,28 51,42 57,64 40,50 23,64 29,42 12,28 34,28'/%3E%3Ccircle cx='40' cy='40' r='18'/%3E%3Cpolygon points='40,14 44,26 56,26 47,34 50,46 40,39 30,46 33,34 24,26 36,26'/%3E%3C/g%3E%3C/svg%3E");
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* ── App container ── */
+.app {
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 0 0 100px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 3px var(--card-shadow),
+    0 6px 24px oklch(0.70 0.02 70 / 0.06);
+  padding: 20px;
+  margin: 0 14px 13px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gold shimmer top edge */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-glow), var(--gold), var(--gold-glow), transparent);
+  opacity: 0.7;
+}
+
+.card-label {
+  font-family: 'Cairo', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-label::before {
+  content: '\2726';
+  font-size: 8px;
+  opacity: 0.7;
+}
+.card-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to left, var(--card-border), transparent);
+}
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 0 0   oklch(0.58 0.145 65 / 0.30); }
+  50%      { box-shadow: 0 0 0 10px oklch(0.58 0.145 65 / 0); }
+}
+@keyframes borderRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.card { animation: fadeUp 0.55s ease both; }
+.card:nth-child(1) { animation-delay: 0.00s; }
+.card:nth-child(2) { animation-delay: 0.08s; }
+.card:nth-child(3) { animation-delay: 0.16s; }
+.card:nth-child(4) { animation-delay: 0.24s; }
+.card:nth-child(5) { animation-delay: 0.32s; }
+.card:nth-child(6) { animation-delay: 0.40s; }
+.card:nth-child(7) { animation-delay: 0.48s; }
+
+/* ── Progress bar ── */
+.progress-track {
+  height: 7px;
+  background: oklch(0.92 0.01 80);
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1px solid oklch(0.88 0.015 75);
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.progress-fill.green { background: linear-gradient(270deg, var(--jade), oklch(0.60 0.10 155)); }
+.progress-fill.gold  { background: linear-gradient(270deg, var(--gold2), var(--gold), oklch(0.68 0.12 72)); }
+
+/* ── Badge ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Cairo', sans-serif;
+}
+.badge-gold  { background: oklch(0.58 0.145 65 / 0.08); color: var(--gold);  border: 1px solid oklch(0.58 0.145 65 / 0.22); }
+.badge-jade  { background: var(--jade-soft);  color: var(--jade);  border: 1px solid oklch(0.52 0.11 162 / 0.22); }
+.badge-amber { background: var(--amber-soft); color: var(--amber); border: 1px solid oklch(0.62 0.14 55  / 0.22); }
+.badge-dim   { background: oklch(0.94 0.008 80); color: var(--text-muted); border: 1px solid oklch(0.88 0.015 75); }
+
+/* ── Decorative ornament ── */
+.ornament {
+  text-align: center;
+  font-size: 18px;
+  color: var(--gold);
+  opacity: 0.5;
+  letter-spacing: 6px;
+  margin: 4px 0 10px;
+  font-family: serif;
+}
+
+/* ── Bar chart ── */
+.bar-wrap { display: flex; flex-direction: column; gap: 2px; flex: 1; align-items: center; }
+.bar-group { display: flex; align-items: flex-end; gap: 2px; height: 80px; }
+.bar {
+  width: 12px; border-radius: 3px 3px 0 0;
+  transition: height 1.1s cubic-bezier(0.16,1,0.3,1);
+}
+.bar-target   { background: oklch(0.92 0.008 80); border: 1px solid oklch(0.86 0.015 75); }
+.bar-achieved { background: linear-gradient(180deg, var(--jade), oklch(0.62 0.10 155)); }
+
+/* ── Heatmap ── */
+.heatmap-cell {
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  position: relative;
+}
+.heatmap-cell:hover { transform: scale(1.35); z-index: 10; filter: brightness(0.92); }
+
+/* ── Tooltip ── */
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 50%; left: auto;
+  transform: translateX(50%);
+  background: oklch(0.99 0.003 80);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 6px 24px oklch(0.50 0.02 60 / 0.15);
+  text-align: right;
+}
+
+/* ── Input ── */
+.calc-input {
+  background: oklch(0.97 0.006 80);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  padding: 10px 14px;
+  width: 80px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  direction: ltr;
+}
+.calc-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px oklch(0.58 0.145 65 / 0.12);
+}
+
+/* ── Share card — parchment certificate ── */
+.share-card {
+  background: linear-gradient(145deg, oklch(0.97 0.02 78), oklch(0.95 0.025 65));
+  border: 1px solid oklch(0.58 0.145 65 / 0.35);
+  border-radius: var(--radius);
+  margin: 0 14px 13px;
+  overflow: hidden;
+  position: relative;
+  animation: fadeUp 0.55s 0.50s ease both;
+  box-shadow:
+    0 2px 8px oklch(0.58 0.145 65 / 0.08),
+    0 8px 32px oklch(0.70 0.03 70 / 0.08);
+}
+.share-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='50' height='50' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23a0845015' stroke-width='0.7'%3E%3Cpolygon points='25,3 29,17 43,17 32,26 36,40 25,31 14,40 18,26 7,17 21,17'/%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+}
+/* Certificate inner border frame */
+.share-card::after {
+  content: '';
+  position: absolute; inset: 6px;
+  border: 1px solid oklch(0.58 0.145 65 / 0.18);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* ── Share button ── */
+.share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: calc(100% - 28px);
+  margin: 0 14px 6px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: linear-gradient(135deg, var(--gold2), var(--gold), oklch(0.68 0.12 72));
+  color: oklch(1 0 0);
+  font-family: 'Cairo', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  animation: glowPulse 3.5s infinite;
+  letter-spacing: 0.01em;
+  box-shadow: 0 3px 12px oklch(0.58 0.145 65 / 0.25);
+}
+.share-btn:hover  { transform: translateY(-2px); filter: brightness(1.08); }
+.share-btn:active { transform: scale(0.97); }
+
+/* ── Stepper btn ── */
+.step-btn {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--card-border);
+  background: oklch(0.97 0.006 80);
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.step-btn:hover { background: oklch(0.94 0.012 75); border-color: var(--gold); }
+
+/* ── Tafsir nav btn ── */
+.tafsir-nav {
+  flex: 1;
+  padding: 10px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid oklch(0.52 0.11 162 / 0.25);
+  background: oklch(0.52 0.11 162 / 0.06);
+  color: var(--jade);
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.tafsir-nav:hover:not(:disabled) {
+  background: oklch(0.52 0.11 162 / 0.12);
+  border-color: var(--jade);
+}
+.tafsir-nav:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Top bar ── */
+.top-bar {
+  padding: 20px 18px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: fadeUp 0.4s ease both;
+}
+
+/* ── Avatar ── */
+.avatar {
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.94 0.03 162), oklch(0.92 0.035 75));
+  border: 2px solid oklch(0.58 0.145 65 / 0.45);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Amiri', serif;
+  font-size: 22px; font-weight: 700;
+  color: var(--gold);
+  animation: glowPulse 4.5s 1s infinite;
+  box-shadow: 0 2px 12px oklch(0.58 0.145 65 / 0.12);
+}
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: linear-gradient(to left, transparent, var(--card-border), transparent);
+  margin: 16px 0;
+}
+
+/* ── Motivation text ── */
+.motivation-text {
+  font-family: 'Amiri', serif;
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.8;
+  color: oklch(0.35 0.03 55);
+  text-wrap: pretty;
+  margin: 6px 0 12px;
+}
+
+/* ── Result box ── */
+.result-box {
+  background: var(--gold-soft);
+  border: 1px solid oklch(0.58 0.145 65 / 0.18);
+  border-radius: 12px;
+  padding: 13px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.82 0.015 75); border-radius: 2px; }
+
+/* Section spacer */
+.section-gap { height: 4px; }
+
+/* ── Loading state ── */
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--card-border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: borderRotate 1s linear infinite;
+}
+
+/* ── Error state ── */
+.error-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}

@@ -1,0 +1,54 @@
+.env
+.env.local
+.token_cache.json
+enjazi.db
+frontend/enjazi.db
+*.db
+*.db.bak.*
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+*.log
+
+# --- أسرار / بيانات حسّاسة (لا تُرفع) ---
+# التقاطات HAR تحتوي توكن دخول إنجازي
+TEST.MD
+CHANGE.MD
+# ملفات عمل/خردة قد تحتوي أسرارًا
+d.txt
+p.txt
+injaz.txt
+au.txt
+re.txt
+e.txt
+ehsaet.txt
+gg.txt
+h.txt
+# مخرجات pip العرضية (ملفات باسم يبدأ بـ =)
+=*.*
+=*
+# مستندات مؤقتة تحتوي مفاتيح Supabase/توكن (تُنظَّف في Phase 7)
+PROGRAM_FEATURES.md
+SUPABASE_STATUS.md
+SUPABASE_SUMMARY.md
+
+# --- التقاطات HAR (توكنات Bearer + هويات/أسماء/جوّالات طلاب حقيقية) — لا تُرفع أبدًا ---
+add.md
+add_student.md
+add_students.md
+check_username.md
+Already exists.md
+NEWTSME3.txt
+TSM3E.txt
+NEWTSME*.txt
+TSM3E*.txt
+*.har
+
+# --- مخرجات تشغيل تحتوي بيانات طلاب ---
+add_students_result.json
+
+# --- كاش توكن (لوحة + تطبيق المعلم) ---
+.teacher_token_cache.json
+*_token_cache.json

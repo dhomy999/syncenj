@@ -1,0 +1,333 @@
+/* ════════════════════════════════════════════════════════════════
+   لوحة الإدارة — بطاقات الطلاب + طباعة A4 (9 بطاقات/صفحة)
+   ════════════════════════════════════════════════════════════════ */
+
+.admin-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px 16px 80px;
+}
+
+/* ── شريط التحكم ── */
+.admin-controls {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px var(--card-shadow), 0 6px 24px oklch(0.7 0.02 70 / 0.06);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.admin-controls-actions {
+  border-top: 1px dashed var(--card-border);
+  padding-top: 12px;
+}
+.admin-h1 {
+  font-family: var(--font-amiri), Amiri, serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+.admin-search {
+  width: 100%;
+}
+.admin-count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.admin-count strong {
+  color: var(--gold2);
+}
+.admin-actions-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.admin-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.admin-hint code {
+  direction: ltr;
+  unicode-bidi: embed;
+  background: var(--gold-soft);
+  color: var(--gold2);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.admin-empty {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 0;
+}
+
+/* ── عناصر مشتركة ── */
+.admin-input {
+  font-family: inherit;
+  font-size: 15px;
+  padding: 11px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.admin-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.admin-btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.08s, filter 0.15s, background 0.15s;
+}
+.admin-btn:active {
+  transform: translateY(1px);
+}
+.admin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-btn-primary {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: var(--cream);
+}
+.admin-btn-primary:not(:disabled):hover {
+  filter: brightness(1.05);
+}
+.admin-btn-ghost {
+  background: var(--card);
+  border-color: var(--card-border);
+  color: var(--text-muted);
+}
+.admin-btn-ghost:not(:disabled):hover {
+  border-color: var(--gold);
+  color: var(--gold2);
+}
+
+/* ── شاشة تسجيل الدخول ── */
+.admin-login {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.admin-login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px oklch(0.7 0.02 70 / 0.12);
+  padding: 32px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.admin-login-icon {
+  font-size: 40px;
+}
+.admin-login-title {
+  font-family: var(--font-amiri), Amiri, serif;
+  font-size: 26px;
+  font-weight: 700;
+}
+.admin-login-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+.admin-login-error {
+  font-size: 13px;
+  color: var(--rose);
+  background: var(--rose-soft);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   منطقة الطباعة — صفحات A4
+   ════════════════════════════════════════════════════════════════ */
+.print-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.print-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10mm;
+  background: #fff;
+  box-shadow: 0 6px 30px oklch(0.5 0.02 70 / 0.18);
+  border-radius: 4px;
+}
+.print-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* ارتفاع صف ثابت: (277mm − صفّا فجوة×6mm) ÷ 3 صفوف */
+  grid-auto-rows: 88.3mm;
+  gap: 6mm;
+  height: 277mm;
+  align-content: start; /* لا تمدّد الصفوف عند وجود أقل من 9 بطاقات */
+}
+
+/* ── البطاقة ── */
+.id-card {
+  border: 1.2px solid #d8c9a6;
+  border-radius: 10px;
+  padding: 5mm 4mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 0%, #fbf6ea, #fff);
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
+  overflow: hidden;
+}
+.id-card:hover {
+  border-color: var(--gold);
+}
+.id-card-selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft) inset;
+}
+.id-card-head {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2mm;
+}
+.id-card-logo {
+  height: 13mm;
+  width: auto;
+  max-width: 80%;
+  object-fit: contain;
+}
+.id-card-brand {
+  font-family: var(--font-amiri), Amiri, serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a07c3a;
+  letter-spacing: 0.2px;
+  line-height: 1.3;
+}
+.id-card-name {
+  font-family: var(--font-amiri), Amiri, serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #2a2118;
+  width: 100%;
+}
+.id-card-qr {
+  width: 30mm;
+  height: 30mm;
+  display: grid;
+  place-items: center;
+}
+.id-card-qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.id-card-qr-ph {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed #d8c9a6;
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    45deg,
+    #f5eeda,
+    #f5eeda 6px,
+    #fff 6px,
+    #fff 12px
+  );
+}
+.id-card-number {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.id-card-number-label {
+  font-size: 9px;
+  color: #9a8a66;
+}
+.id-card-number-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #6b4f1d;
+  direction: ltr;
+  letter-spacing: 0.5px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   قواعد الطباعة
+   ════════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  /* إخفاء الخلفيات الزخرفية للموقع */
+  body::before,
+  body::after {
+    display: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .admin-shell {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .print-area {
+    gap: 0;
+  }
+  .print-page {
+    width: 210mm;
+    height: 297mm;
+    /* أقل بقليل من الورقة لمنع تجاوز يولّد صفحة فارغة */
+    overflow: hidden;
+    box-shadow: none !important;
+    border-radius: 0;
+  }
+  .id-card {
+    cursor: default;
+    /* ضمان طباعة ألوان الخلفية */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
