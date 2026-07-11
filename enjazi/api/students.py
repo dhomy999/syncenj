@@ -197,6 +197,35 @@ class StudentsAPI(BaseAPI):
             headers=headers,
         )
 
+    def change_level(
+        self,
+        student_id: int,
+        episode_id: int,
+        level_id: int,
+        curriculum_id: int | None = None,
+        institution_id: str | None = None,
+    ) -> dict:
+        """
+        POST /institution_panel/students/{student_id}/change-level
+        إسناد مستوى للطالب في حلقة — يُنشئ خطة/سلسلة التسميع تلقائياً (يحل chain_id on null).
+
+        مطابق للالتقاط الحقيقي (chenge_levl.md): episode_id و student_id نصّيّان، level_id عدد،
+        curriculum_id = null افتراضياً.
+        """
+        logger.info(
+            f"change-level: student={student_id} episode={episode_id} level_id={level_id}"
+        )
+        return self._post(
+            f"/institution_panel/students/{student_id}/change-level",
+            json={
+                "episode_id": str(episode_id),
+                "student_id": str(student_id),
+                "level_id": level_id,
+                "curriculum_id": curriculum_id,
+            },
+            headers=cfg.institution_headers(institution_id),
+        )
+
     def check_username(self, username: str, institution_id: str) -> dict:
         """POST /institution_panel/add-user-requests/check-username"""
         return self._post(

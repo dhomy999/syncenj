@@ -21,6 +21,7 @@ def _get_job_runner(job_type: str):
     from backend.jobs.add_students import run as add_students
     from backend.jobs.open_episodes import run as open_episodes
     from backend.jobs.sync_attend100 import run as sync_attend100
+    from backend.jobs.assign_level import run as assign_level
 
     runners = {
         "sync_episodes":        sync_episodes,
@@ -33,6 +34,8 @@ def _get_job_runner(job_type: str):
         "add_students":         add_students,      # 1) تسجيل الطلاب الجدد
         "open_episodes":        open_episodes,     # 2) فتح الحلقات من جهة المعلم
         "sync_attend100":       sync_attend100,    # 3) مزامنة الحضور attend100
+        # إسناد مستوى موحّد للطلاب بلا خطة (يُنشئ خطة التسميع)
+        "assign_level":         assign_level,
     }
     return runners.get(job_type)
 
