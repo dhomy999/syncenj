@@ -29,7 +29,7 @@ class TeacherAppClient:
     """عميل تطبيق المعلم مع إدارة توكن مؤقت خاص به."""
 
     def __init__(self):
-        self._rate_limiter = RateLimiter(base_delay=cfg.REQUEST_DELAY)
+        self._rate_limiter = RateLimiter(base_delay=cfg.REQUEST_DELAY, jitter=cfg.REQUEST_JITTER)
         self._token: str | None = None
         self._session = self._build_session()
 

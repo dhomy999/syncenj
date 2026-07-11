@@ -27,7 +27,7 @@ class EnjaziClient:
     """
 
     def __init__(self, include_context_headers: bool = True):
-        self._rate_limiter = RateLimiter(base_delay=cfg.REQUEST_DELAY)
+        self._rate_limiter = RateLimiter(base_delay=cfg.REQUEST_DELAY, jitter=cfg.REQUEST_JITTER)
         self._token: str | None = None
         self._include_context = include_context_headers
         self._session = self._build_session()

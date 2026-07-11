@@ -31,7 +31,10 @@ TEACHER_TOKEN_CACHE_PATH: Path = Path(os.getenv("TEACHER_TOKEN_CACHE_PATH", ".te
 
 # --- HTTP ---
 REQUEST_TIMEOUT: int = 30
-REQUEST_DELAY: float = float(os.getenv("REQUEST_DELAY", "5.0"))
+# التأخير الفعلي بين الطلبات = REQUEST_DELAY + عشوائي(0..REQUEST_JITTER).
+# الافتراضي [1.5, 3.0] ثانية.
+REQUEST_DELAY: float = float(os.getenv("REQUEST_DELAY", "1.5"))
+REQUEST_JITTER: float = float(os.getenv("REQUEST_JITTER", "1.5"))
 
 USER_AGENT: str = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

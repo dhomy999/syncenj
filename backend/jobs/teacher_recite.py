@@ -32,8 +32,12 @@ from sqlalchemy.orm import Session
 
 from enjazi.teacher_app.client import TeacherAppClient
 from enjazi.teacher_app.api import TeacherAPI
+from enjazi.client import EnjaziClient
+from enjazi.auth import get_valid_token
+from enjazi.api.students import StudentsAPI
 from enjazi.utils.logger import logger
 from backend.supabase_client import get_supabase
+import config.settings as cfg
 
 # رقم الركن في إنجازي → (بادئة حقل Supabase, الاسم)
 PILLARS: dict[int, tuple[str, str]] = {
@@ -73,6 +77,25 @@ def _collect_rows(sb, target_date: str) -> list[dict]:
     return out
 
 
+def _build_episode_map(institution_id: str) -> dict[int, list[int]]:
+    """خريطة enjazi_id → قائمة حلقات الطالب **الحقيقية** من لوحة المنشأة.
+
+    المصدر الموثوق للحلقة هو إنجازي (لا Supabase): ربط الحلقة في Supabase قد يكون
+    قديمًا/خاطئًا بينما الطالب فعليًا في حلقة أخرى.
+    """
+    with EnjaziClient() as c:
+        get_valid_token(c)
+        students = StudentsAPI(c).list_by_institution(str(institution_id), limit=5000)
+    m: dict[int, list[int]] = {}
+    for s in students:
+        sid = s.get("id")
+        eps = [e.get("id") for e in (s.get("episodes_list") or []) if e.get("id")]
+        if sid:
+            m[int(sid)] = [int(x) for x in eps]
+    logger.info(f"teacher_recite: خريطة الحلقات الحقيقية جاهزة ({len(m)} طالب)")
+    return m
+
+
 def _pillar_range(row: dict, pillar: int) -> tuple[int, int] | None:
     """نطاق الركن من Supabase مطبّعًا (from=الأصغر, to=الأكبر)، أو None إن لم يُسمَّع."""
     pref, _ = PILLARS[pillar]
@@ -107,12 +130,9 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
 
     sb = get_supabase()
     rows = _collect_rows(sb, target_date)
-    if one_sid and one_eid:
-        rows = [
-            r for r in rows
-            if (r["students"]["enjazi_id"] == int(one_sid)
-                and r["halaqat"]["enjazi_id"] == int(one_eid))
-        ]
+    # استهداف طالب واحد: بالمطابقة على الطالب فقط (حلقة Supabase قد تكون خاطئة)
+    if one_sid:
+        rows = [r for r in rows if r["students"]["enjazi_id"] == int(one_sid)]
     if limit:
         rows = rows[: int(limit)]
 
@@ -126,7 +146,9 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
         "students": len(rows),
         "pillars_recited": 0,
         "skipped_not_attended": 0,
-        "skipped_not_available": 0,   # «الطالب غير متاح حاليا» من التطبيق
+        "skipped_not_available": 0,      # «الطالب غير متاح حاليا» من التطبيق
+        "skipped_no_episode": 0,         # الطالب غير موجود في المنشأة / بلا حلقة
+        "skipped_multiple_episodes": 0,  # الطالب في أكثر من حلقة — يُتخطّى بتنبيه
         "skipped_already_done": 0,
         "skipped_no_range": 0,
         "skipped_not_scheduled": 0,
@@ -136,14 +158,38 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
     if not rows:
         return result
 
+    # الحلقة الحقيقية لكل طالب من إنجازي (لا نعتمد ربط Supabase).
+    # عند استهداف طالب واحد بحلقة صريحة، نستخدمها مباشرة بلا بناء الخريطة.
+    ep_map = None if (one_sid and one_eid) else _build_episode_map(
+        params.get("institution_id", cfg.INSTITUTION_ID)
+    )
+
     with TeacherAppClient() as client:
         client.get_valid_token()
         api = TeacherAPI(client)
 
         for row in rows:
             sid = int(row["students"]["enjazi_id"])
-            eid = int(row["halaqat"]["enjazi_id"])
             name = row["students"].get("student_name") or str(sid)
+
+            # حلّ الحلقة الحقيقية من إنجازي (الخيار أ)
+            if one_sid and one_eid:
+                eid = int(one_eid)
+            else:
+                real_eps = ep_map.get(sid, [])
+                if not real_eps:
+                    result["skipped_no_episode"] += 1
+                    result["details"].append({"student": name, "sid": sid, "action": "no_episode"})
+                    logger.info(f"[{name}] لا حلقة في إنجازي — تخطٍّ")
+                    continue
+                if len(real_eps) > 1:
+                    result["skipped_multiple_episodes"] += 1
+                    result["details"].append(
+                        {"student": name, "sid": sid, "action": "multiple_episodes", "episodes": real_eps}
+                    )
+                    logger.info(f"[{name}] في {len(real_eps)} حلقات ({real_eps}) — تخطٍّ")
+                    continue
+                eid = real_eps[0]
 
             # درس اليوم المجدول (مرة واحدة للطالب) — للتحقق من الحضور والأركان المجدولة
             try:
@@ -212,7 +258,8 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
 
     logger.info(
         f"teacher_recite: أركان مُسجَّلة={result['pillars_recited']} | غير محضَّر={result['skipped_not_attended']} | "
-        f"غير متاح={result['skipped_not_available']} | مسجَّل مسبقًا={result['skipped_already_done']} | "
+        f"غير متاح={result['skipped_not_available']} | بلا حلقة={result['skipped_no_episode']} | "
+        f"حلقات متعددة={result['skipped_multiple_episodes']} | مسجَّل مسبقًا={result['skipped_already_done']} | "
         f"بلا نطاق={result['skipped_no_range']} | غير مجدول={result['skipped_not_scheduled']} | "
         f"فشل={result['failed']} (dry_run={dry_run})"
     )
