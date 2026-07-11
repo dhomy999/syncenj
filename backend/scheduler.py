@@ -163,6 +163,17 @@ DEFAULT_JOBS = [
         ),
         "params": {"dry_run": True},
     },
+    {
+        "type": "assign_level",
+        "name": "إسناد المستوى للطلاب بلا خطة (يدوي)",
+        "cron_expression": None,  # يدوي فقط — يُشغّل من زر «تشغيل»
+        "description": (
+            "يُسند مستوى موحّدًا (level_id=1745) لكل طالب لا خطة تسميع له، فيُنشئ الخطة تلقائيًا "
+            "(change-level) ويحل خطأ chain_id on null. يفحص كل طالب ولا يلمس من عنده خطة. "
+            "يُشحن dry_run=True — شغّله تجريبيًا أولًا ثم حوّله إلى «مباشر»."
+        ),
+        "params": {"dry_run": True},
+    },
 ]
 
 # أنواع مهام افتراضية قديمة تُعطَّل عند الإقلاع (استُبدلت بالعمليات الثلاث أعلاه).
@@ -197,6 +208,9 @@ def ensure_default_jobs():
             db.add(job)
             db.commit()
             db.refresh(job)
+            if not job.cron_expression:
+                logger.info(f"Seeded manual default job [{job.name}] (بلا جدولة)")
+                continue
             try:
                 _schedule_job(job)
                 logger.info(f"Seeded default job [{job.name}] -> cron: {job.cron_expression}")
