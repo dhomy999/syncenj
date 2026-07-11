@@ -9,6 +9,8 @@
     python assign_level_individual.py --go --limit 5       # إرسال فعلي، 5 طلاب
     python assign_level_individual.py --student 86842 --episode 11640 --go   # طالب بعينه
     python assign_level_individual.py --level 1745         # مستوى مخصّص
+    python assign_level_individual.py --limit all          # محاكاة كل الطلاب
+    python assign_level_individual.py --limit all --scan 50000 --go   # إرسال للكل
 """
 from __future__ import annotations
 
@@ -35,10 +37,13 @@ def _arg(flag: str, default=None):
 
 def main() -> None:
     go = "--go" in sys.argv                       # بدونه = محاكاة (dry_run)
+    limit_arg = str(_arg("--limit", 1)).lower()
+    limit = None if limit_arg == "all" else int(limit_arg)
     params: dict = {
         "dry_run": not go,
         "level_id": int(_arg("--level", DEFAULT_LEVEL_ID)),
-        "limit": int(_arg("--limit", 1)),
+        "limit": limit,
+        "scan_limit": int(_arg("--scan", 5000)),
     }
     student = _arg("--student")
     episode = _arg("--episode")
@@ -47,7 +52,8 @@ def main() -> None:
         params["episode_id"] = int(episode)
 
     mode = "إرسال فعلي ✍️" if go else "محاكاة (dry-run) 🧪"
-    print(f"الوضع: {mode} | المستوى: {params['level_id']} | الحد: {params['limit']}")
+    limit_show = "الكل" if params["limit"] is None else params["limit"]
+    print(f"الوضع: {mode} | المستوى: {params['level_id']} | الحد: {limit_show}")
     if student and episode:
         print(f"مستهدف: طالب {student} / حلقة {episode}")
     print("-" * 60)
