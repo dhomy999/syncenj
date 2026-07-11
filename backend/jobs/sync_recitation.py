@@ -53,6 +53,17 @@ _PILLARS: list[tuple[str, int]] = [
 ]
 
 
+# علامات تدلّ على أن الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة/مستوى) — خطأ خادم إنجازي
+# عند قراءة history-lessons أو plan لطالب بلا سلسلة حفظ. تُعامَل كتخطٍّ نظيف لا كفشل.
+_NOT_CONFIGURED_SIGNS = ("chain_id", "on null", "std_level_id")
+
+
+def _is_not_configured(exc: Exception) -> bool:
+    """هل الخطأ سببه أن الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة)؟"""
+    msg = str(exc).lower()
+    return any(sign.lower() in msg for sign in _NOT_CONFIGURED_SIGNS)
+
+
 def _today(tz_name: str) -> str:
     return datetime.now(ZoneInfo(tz_name)).date().isoformat()
 
@@ -140,8 +151,9 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
         "dry_run": dry_run,
         "eligible": len(rows),
         "added": 0,
-        "skipped_existing": 0,   # للطالب تسميع مسجّل مسبقاً في إنجازي
-        "skipped_empty": 0,      # لا ركن مُسمَّع (كل الأركان "لم يسمع"/بلا مدى)
+        "skipped_existing": 0,       # للطالب تسميع مسجّل مسبقاً في إنجازي
+        "skipped_empty": 0,          # لا ركن مُسمَّع (كل الأركان "لم يسمع"/بلا مدى)
+        "skipped_not_configured": 0, # الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة)
         "failed": 0,
         "details": [],
     }
@@ -219,6 +231,17 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
                 result["details"].append(detail)
 
             except Exception as exc:
+                # الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة) ⇒ تخطٍّ نظيف، لا فشل.
+                if _is_not_configured(exc):
+                    detail["action"] = "skipped_not_configured"
+                    detail["reason"] = str(exc)
+                    result["skipped_not_configured"] += 1
+                    result["details"].append(detail)
+                    logger.info(f"[{name}] الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة) — تخطٍّ")
+                    if not dry_run:
+                        _mark_synced(sb, row["id"], note="تخطٍّ: الطالب غير مُهيّأ في الحلقة (لا خطة/سلسلة)")
+                    continue
+
                 result["failed"] += 1
                 detail["action"] = "failed"
                 detail["error"] = str(exc)
@@ -232,6 +255,7 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
 
     logger.info(
         f"sync_recitation: أُضيف={result['added']} | تخطٍّ(موجود)={result['skipped_existing']} | "
-        f"تخطٍّ(فارغ)={result['skipped_empty']} | فشل={result['failed']} (dry_run={dry_run})"
+        f"تخطٍّ(فارغ)={result['skipped_empty']} | تخطٍّ(غير مُهيّأ)={result['skipped_not_configured']} | "
+        f"فشل={result['failed']} (dry_run={dry_run})"
     )
     return result
