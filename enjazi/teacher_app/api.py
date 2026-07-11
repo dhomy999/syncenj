@@ -75,3 +75,59 @@ class TeacherAPI:
             json={"students": students},
             episode_id=episode_id,
         )
+
+    # ─── إدخال التسميع الفردي (من تطبيق المعلم) ──────────────────────────────
+    # مؤكَّد من تنفيذ حيّ (INJAAZY_AUTOMATION_GUIDE.md §4). الشرط المسبق: الطالب محضَّر اليوم.
+    #   الأركان: 2=حفظ (بدايته مقفلة على الخطة)، 3=مراجعة، 4=تثبيت.
+
+    def get_student_lessons(self, student_id: int, episode_id: int) -> dict:
+        """GET teacher/students/{sid}/lessons — درس اليوم لكل ركن (from/to + الحالة)."""
+        resp = self.client.get(
+            f"teacher/students/{student_id}/lessons", episode_id=episode_id
+        )
+        return resp.get("data", {}) if isinstance(resp, dict) else {}
+
+    def get_history_lessons(self, student_id: int, episode_id: int, date_of: str) -> dict:
+        """GET teacher/students/{sid}/history-lessons?date_of= — السجل الفعلي المسجَّل ليوم."""
+        resp = self.client.get(
+            f"teacher/students/{student_id}/history-lessons",
+            params={"date_of": date_of},
+            episode_id=episode_id,
+        )
+        return resp.get("data", {}) if isinstance(resp, dict) else {}
+
+    def recite(self, student_id: int, episode_id: int, pillar_id: int) -> dict:
+        """POST teacher/students/{sid}/recite — تسجيل الركن بنطاق درس اليوم الافتراضي."""
+        return self.client.post(
+            f"teacher/students/{student_id}/recite",
+            json={"pillar_id": pillar_id},
+            episode_id=episode_id,
+        )
+
+    def change_starting(
+        self, student_id: int, episode_id: int, pillar_id: int, from_verse_id: int
+    ) -> dict:
+        """POST teacher/students/{sid}/change-starting — نقل بداية الركن (يعيد حساب النهاية).
+
+        لا يصلح لركن الحفظ (2) — بدايته مقفلة على الخطة.
+        """
+        return self.client.post(
+            f"teacher/students/{student_id}/change-starting",
+            json={"pillar_id": pillar_id, "from_verse_id": from_verse_id},
+            episode_id=episode_id,
+        )
+
+    def extra_recite(
+        self, student_id: int, episode_id: int, pillar_id: int,
+        from_verse_id: int, to_verse_id: int,
+    ) -> dict:
+        """POST teacher/students/{sid}/extra-recite — تمديد النطاق (غير متزامن: queued=true)."""
+        return self.client.post(
+            f"teacher/students/{student_id}/extra-recite",
+            json={
+                "pillar_id": pillar_id,
+                "from_verse_id": from_verse_id,
+                "to_verse_id": to_verse_id,
+            },
+            episode_id=episode_id,
+        )
