@@ -35,6 +35,7 @@ from enjazi.teacher_app.api import TeacherAPI
 from enjazi.client import EnjaziClient
 from enjazi.auth import get_valid_token
 from enjazi.api.students import StudentsAPI
+from enjazi.api.recitation import RecitationAPI
 from enjazi.utils.logger import logger
 from backend.supabase_client import get_supabase
 import config.settings as cfg
@@ -77,15 +78,13 @@ def _collect_rows(sb, target_date: str) -> list[dict]:
     return out
 
 
-def _build_episode_map(institution_id: str) -> dict[int, list[int]]:
+def _build_episode_map(stu_api: StudentsAPI, institution_id: str) -> dict[int, list[int]]:
     """خريطة enjazi_id → قائمة حلقات الطالب **الحقيقية** من لوحة المنشأة.
 
     المصدر الموثوق للحلقة هو إنجازي (لا Supabase): ربط الحلقة في Supabase قد يكون
     قديمًا/خاطئًا بينما الطالب فعليًا في حلقة أخرى.
     """
-    with EnjaziClient() as c:
-        get_valid_token(c)
-        students = StudentsAPI(c).list_by_institution(str(institution_id), limit=5000)
+    students = stu_api.list_by_institution(str(institution_id), limit=5000)
     m: dict[int, list[int]] = {}
     for s in students:
         sid = s.get("id")
@@ -108,17 +107,6 @@ def _pillar_range(row: dict, pillar: int) -> tuple[int, int] | None:
     return (min(a, b), max(a, b))
 
 
-def _pillar_lesson(api: TeacherAPI, sid: int, eid: int, pillar: int) -> dict | None:
-    """درس الركن المجدول اليوم (أو None إن لم يكن مجدولًا)."""
-    data = api.get_student_lessons(sid, eid)
-    if not data.get("has_lessons"):
-        return {"_not_attended": True}
-    for L in data.get("lessons", []):
-        if L.get("pillar_id") == pillar:
-            return L
-    return None
-
-
 async def run(params: dict, log_id: int, db: Session) -> dict:
     tz_name = params.get("timezone", "Asia/Riyadh")
     target_date = params.get("date") or _today(tz_name)
@@ -127,6 +115,8 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
     pillars = [int(p) for p in (params.get("pillars") or DEFAULT_PILLARS)]
     one_sid = params.get("student_enjazi_id")
     one_eid = params.get("episode_id")
+    # Supabase هو المصدر: وجود سجل تسميع = الطالب حاضر. فنحضّره تلقائيًا إن ظهر غائبًا.
+    auto_attend = bool(params.get("auto_attend", True))
 
     sb = get_supabase()
     rows = _collect_rows(sb, target_date)
@@ -145,8 +135,8 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
         "dry_run": dry_run,
         "students": len(rows),
         "pillars_recited": 0,
-        "skipped_not_attended": 0,
-        "skipped_not_available": 0,      # «الطالب غير متاح حاليا» من التطبيق
+        "attended": 0,                   # طلاب حُضِّروا تلقائيًا (كانوا غائبين)
+        "skipped_could_not_attend": 0,   # تعذّر تحضيرهم (يُتخطّون)
         "skipped_no_episode": 0,         # الطالب غير موجود في المنشأة / بلا حلقة
         "skipped_multiple_episodes": 0,  # الطالب في أكثر من حلقة — يُتخطّى بتنبيه
         "skipped_already_done": 0,
@@ -158,107 +148,138 @@ async def run(params: dict, log_id: int, db: Session) -> dict:
     if not rows:
         return result
 
-    # الحلقة الحقيقية لكل طالب من إنجازي (لا نعتمد ربط Supabase).
-    # عند استهداف طالب واحد بحلقة صريحة، نستخدمها مباشرة بلا بناء الخريطة.
-    ep_map = None if (one_sid and one_eid) else _build_episode_map(
-        params.get("institution_id", cfg.INSTITUTION_ID)
-    )
+    institution_id = params.get("institution_id", cfg.INSTITUTION_ID)
 
-    with TeacherAppClient() as client:
-        client.get_valid_token()
-        api = TeacherAPI(client)
+    # عميل لوحة المنشأة: لبناء خريطة الحلقات وللتحضير attend100 (فردي، بلا نطاق انفجار).
+    inst_client = EnjaziClient()
+    get_valid_token(inst_client)
+    rec_api = RecitationAPI(inst_client)
+    stu_api = StudentsAPI(inst_client)
+    ep_map = None if (one_sid and one_eid) else _build_episode_map(stu_api, institution_id)
 
-        for row in rows:
-            sid = int(row["students"]["enjazi_id"])
-            name = row["students"].get("student_name") or str(sid)
+    try:
+        with TeacherAppClient() as client:
+            client.get_valid_token()
+            api = TeacherAPI(client)
 
-            # حلّ الحلقة الحقيقية من إنجازي (الخيار أ)
-            if one_sid and one_eid:
-                eid = int(one_eid)
-            else:
-                real_eps = ep_map.get(sid, [])
-                if not real_eps:
-                    result["skipped_no_episode"] += 1
-                    result["details"].append({"student": name, "sid": sid, "action": "no_episode"})
-                    logger.info(f"[{name}] لا حلقة في إنجازي — تخطٍّ")
-                    continue
-                if len(real_eps) > 1:
-                    result["skipped_multiple_episodes"] += 1
-                    result["details"].append(
-                        {"student": name, "sid": sid, "action": "multiple_episodes", "episodes": real_eps}
-                    )
-                    logger.info(f"[{name}] في {len(real_eps)} حلقات ({real_eps}) — تخطٍّ")
-                    continue
-                eid = real_eps[0]
+            for row in rows:
+                sid = int(row["students"]["enjazi_id"])
+                name = row["students"].get("student_name") or str(sid)
 
-            # درس اليوم المجدول (مرة واحدة للطالب) — للتحقق من الحضور والأركان المجدولة
-            try:
-                lessons_data = api.get_student_lessons(sid, eid)
-            except Exception as exc:
-                # «الطالب غير متاح حاليا» = غير محضَّر/متاح اليوم ⇒ تخطٍّ نظيف لا فشل.
-                if "غير متاح" in str(exc):
-                    result["skipped_not_available"] += 1
-                    result["details"].append({"student": name, "sid": sid, "action": "not_available"})
-                    logger.info(f"[{name}] غير متاح اليوم في التطبيق — تخطٍّ")
-                    continue
-                result["failed"] += 1
-                result["details"].append({"student": name, "sid": sid, "eid": eid, "error": str(exc)})
-                logger.error(f"[{name}] تعذّر جلب الدروس: {exc}")
-                continue
+                # حلّ الحلقة الحقيقية من إنجازي (الخيار أ)
+                if one_sid and one_eid:
+                    eid = int(one_eid)
+                else:
+                    real_eps = ep_map.get(sid, [])
+                    if not real_eps:
+                        result["skipped_no_episode"] += 1
+                        result["details"].append({"student": name, "sid": sid, "action": "no_episode"})
+                        logger.info(f"[{name}] لا حلقة في إنجازي — تخطٍّ")
+                        continue
+                    if len(real_eps) > 1:
+                        result["skipped_multiple_episodes"] += 1
+                        result["details"].append(
+                            {"student": name, "sid": sid, "action": "multiple_episodes", "episodes": real_eps}
+                        )
+                        logger.info(f"[{name}] في {len(real_eps)} حلقات ({real_eps}) — تخطٍّ")
+                        continue
+                    eid = real_eps[0]
 
-            if not lessons_data.get("has_lessons"):
-                result["skipped_not_attended"] += 1
-                result["details"].append({"student": name, "sid": sid, "action": "not_attended"})
-                logger.info(f"[{name}] غير محضَّر اليوم — تخطٍّ")
-                continue
+                # درس اليوم + حالة الحضور. «غير متاح» = غير موجود/محضَّر ⇒ نعالجه بالتحضير.
+                try:
+                    lessons_data = api.get_student_lessons(sid, eid)
+                except Exception as exc:
+                    if "غير متاح" in str(exc):
+                        lessons_data = None
+                    else:
+                        result["failed"] += 1
+                        result["details"].append({"student": name, "sid": sid, "eid": eid, "error": str(exc)})
+                        logger.error(f"[{name}] تعذّر جلب الدروس: {exc}")
+                        continue
 
-            scheduled = {L.get("pillar_id"): L for L in lessons_data.get("lessons", [])}
+                attendece = (lessons_data or {}).get("attendece")
+                is_present = (
+                    bool(lessons_data)
+                    and lessons_data.get("has_lessons")
+                    and attendece not in ("absent", "not-attend", None)
+                )
 
-            for pillar in pillars:
-                pname = PILLARS[pillar][1]
-                rng = _pillar_range(row, pillar)
-                if rng is None:
-                    result["skipped_no_range"] += 1
-                    continue
-                frm, to = rng
+                # الطالب غائب/غير متاح — Supabase يقول عنده تسميع = حاضر ⇒ نحضّره تلقائيًا.
+                if not is_present:
+                    if not auto_attend:
+                        result["skipped_could_not_attend"] += 1
+                        result["details"].append({"student": name, "sid": sid, "eid": eid, "action": "absent"})
+                        continue
+                    if dry_run:
+                        result["attended"] += 1
+                        logger.info(f"[DRY-RUN] [{name}] سيُحضَّر (attend100) ثم يُسجَّل — حلقة {eid}")
+                    else:
+                        try:
+                            rec_api.change_recite(sid, eid, target_date, lessons=[], attend_type="attend100")
+                            result["attended"] += 1
+                            logger.info(f"[{name}] حُضِّر (attend100) — حلقة {eid}")
+                            lessons_data = api.get_student_lessons(sid, eid)  # إعادة الجلب بعد التحضير
+                        except Exception as exc:
+                            result["skipped_could_not_attend"] += 1
+                            result["details"].append(
+                                {"student": name, "sid": sid, "eid": eid, "action": "could_not_attend", "error": str(exc)}
+                            )
+                            logger.error(f"[{name}] تعذّر تحضيره — {exc}")
+                            continue
 
-                L = scheduled.get(pillar)
-                if not L:
+                if not lessons_data or not lessons_data.get("has_lessons"):
                     result["skipped_not_scheduled"] += 1
                     continue
-                if L.get("done"):
-                    result["skipped_already_done"] += 1
-                    continue
 
-                detail = {"student": name, "sid": sid, "eid": eid, "pillar": pillar,
-                          "pillar_name": pname, "from": frm, "to": to}
-                try:
-                    if dry_run:
-                        detail["action"] = "dry_run"
-                        logger.info(f"[DRY-RUN] [{name}] {pname}: {frm}→{to}")
-                    else:
-                        # 1) ضبط البداية  2) تسجيل  3) تمديد للنهاية المطلوبة
-                        api.change_starting(sid, eid, pillar, frm)
-                        api.recite(sid, eid, pillar)
-                        computed_end = _recited_end(api, sid, eid, pillar)
-                        if computed_end is not None and computed_end < to:
-                            api.extra_recite(sid, eid, pillar, computed_end + 1, to)
-                            detail["extra"] = [computed_end + 1, to]
-                        detail["action"] = "recited"
-                        detail["recited_end"] = computed_end
-                        result["pillars_recited"] += 1
-                        logger.info(f"[{name}] {pname}: سُجِّل {frm}→{to} ✅")
-                    result["details"].append(detail)
-                except Exception as exc:
-                    result["failed"] += 1
-                    detail["action"] = "failed"
-                    detail["error"] = str(exc)
-                    result["details"].append(detail)
-                    logger.error(f"[{name}] {pname}: فشل — {exc}")
+                scheduled = {L.get("pillar_id"): L for L in lessons_data.get("lessons", [])}
+
+                for pillar in pillars:
+                    pname = PILLARS[pillar][1]
+                    rng = _pillar_range(row, pillar)
+                    if rng is None:
+                        result["skipped_no_range"] += 1
+                        continue
+                    frm, to = rng
+
+                    L = scheduled.get(pillar)
+                    if not L:
+                        result["skipped_not_scheduled"] += 1
+                        continue
+                    if L.get("done"):
+                        result["skipped_already_done"] += 1
+                        continue
+
+                    detail = {"student": name, "sid": sid, "eid": eid, "pillar": pillar,
+                              "pillar_name": pname, "from": frm, "to": to}
+                    try:
+                        if dry_run:
+                            detail["action"] = "dry_run"
+                            logger.info(f"[DRY-RUN] [{name}] {pname}: {frm}→{to}")
+                        else:
+                            # 1) ضبط البداية  2) تسجيل  3) تمديد للنهاية المطلوبة
+                            api.change_starting(sid, eid, pillar, frm)
+                            api.recite(sid, eid, pillar)
+                            computed_end = _recited_end(api, sid, eid, pillar)
+                            if computed_end is not None and computed_end < to:
+                                api.extra_recite(sid, eid, pillar, computed_end + 1, to)
+                                detail["extra"] = [computed_end + 1, to]
+                            detail["action"] = "recited"
+                            detail["recited_end"] = computed_end
+                            result["pillars_recited"] += 1
+                            logger.info(f"[{name}] {pname}: سُجِّل {frm}→{to} ✅")
+                        result["details"].append(detail)
+                    except Exception as exc:
+                        result["failed"] += 1
+                        detail["action"] = "failed"
+                        detail["error"] = str(exc)
+                        result["details"].append(detail)
+                        logger.error(f"[{name}] {pname}: فشل — {exc}")
+    finally:
+        inst_client.close()
 
     logger.info(
-        f"teacher_recite: أركان مُسجَّلة={result['pillars_recited']} | غير محضَّر={result['skipped_not_attended']} | "
-        f"غير متاح={result['skipped_not_available']} | بلا حلقة={result['skipped_no_episode']} | "
+        f"teacher_recite: أركان مُسجَّلة={result['pillars_recited']} | حُضِّروا={result['attended']} | "
+        f"تعذّر تحضيرهم={result['skipped_could_not_attend']} | بلا حلقة={result['skipped_no_episode']} | "
         f"حلقات متعددة={result['skipped_multiple_episodes']} | مسجَّل مسبقًا={result['skipped_already_done']} | "
         f"بلا نطاق={result['skipped_no_range']} | غير مجدول={result['skipped_not_scheduled']} | "
         f"فشل={result['failed']} (dry_run={dry_run})"
