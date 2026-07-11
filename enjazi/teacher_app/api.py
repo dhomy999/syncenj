@@ -131,3 +131,11 @@ class TeacherAPI:
             },
             episode_id=episode_id,
         )
+
+    def cancel_recite(self, student_id: int, episode_id: int, pillar_id: int) -> dict:
+        """POST teacher/students/{sid}/cancel-recite — التراجع عن تسميع ركن (للتنظيف)."""
+        return self.client.post(
+            f"teacher/students/{student_id}/cancel-recite",
+            json={"pillar_id": pillar_id},
+            episode_id=episode_id,
+        )
