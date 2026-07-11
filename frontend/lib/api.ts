@@ -19,6 +19,7 @@ export type JobType =
   | "open_episodes"
   | "sync_attend100"
   | "assign_level"
+  | "teacher_recite"
   | "sync_students"
   | "sync_recitation"
   | "sync_episodes"

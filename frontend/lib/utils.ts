@@ -20,6 +20,7 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   open_episodes:               "فتح الحلقات (من المعلم)",
   sync_attend100:              "مزامنة الحضور (attend100)",
   assign_level:                "إسناد المستوى (إنشاء خطة)",
+  teacher_recite:              "إدخال التسميع (تطبيق المعلّم)",
   // مهام مساندة
   sync_students:               "مطابقة الطلاب (ربط enjazi_id)",
   sync_recitation:             "مزامنة التسميع الكامل",

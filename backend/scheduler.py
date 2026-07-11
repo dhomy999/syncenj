@@ -22,6 +22,7 @@ def _get_job_runner(job_type: str):
     from backend.jobs.open_episodes import run as open_episodes
     from backend.jobs.sync_attend100 import run as sync_attend100
     from backend.jobs.assign_level import run as assign_level
+    from backend.jobs.teacher_recite import run as teacher_recite
 
     runners = {
         "sync_episodes":        sync_episodes,
@@ -36,6 +37,8 @@ def _get_job_runner(job_type: str):
         "sync_attend100":       sync_attend100,    # 3) مزامنة الحضور attend100
         # إسناد مستوى موحّد للطلاب بلا خطة (يُنشئ خطة التسميع)
         "assign_level":         assign_level,
+        # إدخال تسميع اليوم عبر تطبيق المعلّم (بديل sync_recitation)
+        "teacher_recite":       teacher_recite,
     }
     return runners.get(job_type)
 
@@ -170,6 +173,17 @@ DEFAULT_JOBS = [
         "description": (
             "يُسند مستوى موحّدًا (level_id=1745) لكل طالب لا خطة تسميع له، فيُنشئ الخطة تلقائيًا "
             "(change-level) ويحل خطأ chain_id on null. يفحص كل طالب ولا يلمس من عنده خطة. "
+            "يُشحن dry_run=True — شغّله تجريبيًا أولًا ثم حوّله إلى «مباشر»."
+        ),
+        "params": {"dry_run": True},
+    },
+    {
+        "type": "teacher_recite",
+        "name": "إدخال التسميع عبر تطبيق المعلّم (يدوي)",
+        "cron_expression": None,  # يدوي فقط
+        "description": (
+            "يسجّل تسميع اليوم لكل طالب محضَّر عبر تطبيق المعلّم (change-starting + recite + "
+            "extra-recite) بمصدر Supabase. الدرجة «ممتاز» للكل حاليًا. idempotent (يتخطّى المسجَّل). "
             "يُشحن dry_run=True — شغّله تجريبيًا أولًا ثم حوّله إلى «مباشر»."
         ),
         "params": {"dry_run": True},

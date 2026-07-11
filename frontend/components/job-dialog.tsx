@@ -13,6 +13,7 @@ const JOB_TYPES: { value: JobType; label: string }[] = [
   { value: "open_episodes",               label: "فتح الحلقات (من المعلم)" },
   { value: "sync_attend100",              label: "مزامنة الحضور (attend100)" },
   { value: "assign_level",                label: "إسناد المستوى (إنشاء خطة)" },
+  { value: "teacher_recite",              label: "إدخال التسميع (تطبيق المعلّم)" },
   // مهام مساندة
   { value: "sync_students",               label: "مطابقة الطلاب (ربط enjazi_id)" },
   { value: "sync_recitation",             label: "مزامنة التسميع الكامل" },
