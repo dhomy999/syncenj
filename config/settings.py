@@ -36,6 +36,15 @@ REQUEST_TIMEOUT: int = 30
 REQUEST_DELAY: float = float(os.getenv("REQUEST_DELAY", "1.5"))
 REQUEST_JITTER: float = float(os.getenv("REQUEST_JITTER", "1.5"))
 
+# --- عامل مزامنة التسميع (بلا cron) ---
+# يدور داخل الـ backend: يسحب صفوف quran_recitation المعلّقة (أي تاريخ) ويزامنها.
+# الافتراضي معطَّل: تفعيله يبدأ الكتابة الفعلية في إنجازي لكل المتراكم فور تشغيل الخادم.
+# فعّله بـ RECITE_WORKER_ENABLED=true في .env بعد تجربة دفعة صغيرة من صفحة «مزامنة التسميع».
+RECITE_WORKER_ENABLED: bool = os.getenv("RECITE_WORKER_ENABLED", "false").lower() == "true"
+RECITE_WORKER_BATCH: int = int(os.getenv("RECITE_WORKER_BATCH", "25"))
+RECITE_WORKER_INTERVAL: int = int(os.getenv("RECITE_WORKER_INTERVAL", "10"))        # بعد دفعة فيها عمل
+RECITE_WORKER_IDLE_INTERVAL: int = int(os.getenv("RECITE_WORKER_IDLE_INTERVAL", "60"))  # لا معلّق
+
 USER_AGENT: str = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "

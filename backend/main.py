@@ -11,7 +11,8 @@ from contextlib import asynccontextmanager
 
 from backend.database import init_db
 from backend.scheduler import scheduler, load_jobs_from_db, ensure_default_jobs
-from backend.routers import jobs, data, logs, import_csv, student_page, halaqat, students
+from backend.routers import jobs, data, logs, import_csv, student_page, halaqat, students, recitation
+from backend import worker
 from enjazi.utils.logger import logger
 
 
@@ -25,8 +26,10 @@ async def lifespan(app: FastAPI):
     ensure_default_jobs()
     load_jobs_from_db()
     logger.info("Scheduler started.")
+    worker.start()          # عامل مزامنة التسميع المستمر (بلا cron)
     yield
     # --- Shutdown ---
+    await worker.stop()
     scheduler.shutdown()
     logger.info("Scheduler stopped.")
 
@@ -57,6 +60,7 @@ app.include_router(import_csv.router, prefix="/api/import", tags=["الاستي�
 app.include_router(student_page.router, prefix="/api/student-page", tags=["لوحة الطالب"])
 app.include_router(halaqat.router,  prefix="/api/halaqat",  tags=["الحلقات"])
 app.include_router(students.router, prefix="/api/students", tags=["الطلاب"])
+app.include_router(recitation.router, prefix="/api/recitation", tags=["مزامنة التسميع"])
 
 
 @app.get("/", tags=["Health"])

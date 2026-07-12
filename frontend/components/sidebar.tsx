@@ -10,6 +10,7 @@ import {
   Users,
   BookOpen,
   UserPlus,
+  RefreshCcwDot,
 } from "lucide-react";
 
 const nav = [
@@ -18,6 +19,7 @@ const nav = [
   { href: "/logs",       label: "السجلات",         icon: ScrollText },
   { href: "/students",   label: "الطلاب",          icon: Users },
   { href: "/halaqat",    label: "الحلقات",         icon: BookOpen },
+  { href: "/recitation", label: "مزامنة التسميع",  icon: RefreshCcwDot },
   { href: "/import",     label: "إضافة طلاب",      icon: UserPlus },
 ];
 

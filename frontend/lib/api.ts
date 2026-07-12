@@ -137,6 +137,45 @@ export const studentsApi = {
     api.get<ListResponse<SupaStudent>>("/api/students", { params }),
 };
 
+// --- مزامنة التسميع (العامل الدائم) ---
+export type SyncStatus = "pending" | "synced" | "skipped" | "failed";
+
+export interface ReciteStats {
+  counts: Record<SyncStatus | "total" | "stuck", number>;
+  worker: {
+    enabled: boolean;
+    running: boolean;
+    cycles: number;
+    last_result: Record<string, number | boolean | null> | null;
+    last_error: string | null;
+    batch: number;
+    interval: number;
+  };
+  max_attempts: number;
+}
+
+export interface ReciteRow {
+  id: string;
+  recite_date: string | null;
+  student_name: string | null;
+  enjazi_id: number | null;
+  halqa_code: string | null;
+  sync_status: SyncStatus;
+  sync_attempts: number;
+  sync_error: string | null;
+  synced_at: string | null;
+}
+
+export const recitationApi = {
+  stats: () => api.get<ReciteStats>("/api/recitation/stats"),
+  rows:  (status: SyncStatus, limit = 200) =>
+    api.get<ListResponse<ReciteRow>>("/api/recitation/rows", { params: { status, limit } }),
+  retry: (row_ids?: string[]) =>
+    api.post<{ ok: boolean; requeued: number }>("/api/recitation/retry", { row_ids: row_ids ?? null }),
+  run:   (limit = 25) =>
+    apiSlow.post<Record<string, number | boolean>>("/api/recitation/run", null, { params: { limit } }),
+};
+
 export const dataApi = {
   branches:          ()              => api.get<CachedResponse>("/api/data/branches"),
   facilities:        ()              => api.get<CachedResponse>("/api/data/facilities"),
