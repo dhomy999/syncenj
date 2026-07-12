@@ -82,13 +82,13 @@ def _pillar_range(row: dict, pillar: int) -> tuple[int, int] | None:
 
 
 def fetch_pending(sb, limit: int = DEFAULT_BATCH) -> list[dict]:
-    """الصفوف المعلّقة (أي تاريخ)، الأقدم أولًا. failed يُعاد حتى MAX_ATTEMPTS."""
+    """الصفوف المعلّقة (أي تاريخ)، **الأحدث أولًا**. failed يُعاد حتى MAX_ATTEMPTS."""
     rows = (
         sb.table("quran_recitation")
         .select(_ROW_SELECT)
         .in_("sync_status", ["pending", "failed"])
         .lt("sync_attempts", MAX_ATTEMPTS)
-        .order("recite_date")
+        .order("recite_date", desc=True)
         .limit(limit)
         .execute()
         .data
