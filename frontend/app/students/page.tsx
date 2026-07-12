@@ -33,7 +33,8 @@ export default function StudentsPage() {
     !search ||
     String(s.student_number).includes(search) ||
     (s.student_national_id ?? "").includes(search) ||
-    (s.student_name ?? "").includes(search)
+    (s.student_name ?? "").includes(search) ||
+    (s.halaqat ?? []).some((h) => h.includes(search))
   );
 
   const linkedCount = students.filter((s) => s.linked).length;
@@ -66,6 +67,7 @@ export default function StudentsPage() {
                   name:     s.student_name,
                   dept:     s.department ?? "—",
                   category: s.category ?? "—",
+                  halaqat:  (s.halaqat ?? []).join("، ") || "—",
                   status:   s.status ?? "—",
                   enjazi:   s.enjazi_id ?? "—",
                 })),
@@ -75,6 +77,7 @@ export default function StudentsPage() {
                   { key: "name",     label: "الاسم" },
                   { key: "dept",     label: "القسم" },
                   { key: "category", label: "الفئة" },
+                  { key: "halaqat",  label: "الحلقات" },
                   { key: "status",   label: "الحالة" },
                   { key: "enjazi",   label: "رقم إنجازي" },
                 ],
@@ -116,6 +119,7 @@ export default function StudentsPage() {
                   <th className="px-4 py-3 font-medium">رقم الهوية</th>
                   <th className="px-4 py-3 font-medium">الاسم</th>
                   <th className="px-4 py-3 font-medium">القسم</th>
+                  <th className="px-4 py-3 font-medium">الحلقات</th>
                   <th className="px-4 py-3 font-medium">الحالة</th>
                   <th className="px-4 py-3 font-medium">إنجازي</th>
                 </tr>
@@ -127,6 +131,10 @@ export default function StudentsPage() {
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{s.student_national_id ?? "—"}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{s.student_name}</td>
                     <td className="px-4 py-3 text-gray-500">{s.department ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 max-w-[220px] truncate"
+                        title={(s.halaqat ?? []).join("، ")}>
+                      {(s.halaqat ?? []).join("، ") || "—"}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{s.status ?? "—"}</td>
                     <td className="px-4 py-3">
                       {s.linked ? (

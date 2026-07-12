@@ -112,6 +112,7 @@ export interface SupaStudent {
   status: string | null;
   enjazi_id: number | null;
   linked: boolean;
+  halaqat: string[];
 }
 
 export interface EnjaziEpisode {
