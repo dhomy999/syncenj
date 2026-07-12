@@ -5,7 +5,8 @@ import { halaqatApi, Halqa, EnjaziEpisode } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Link2, Check, X } from "lucide-react";
+import { RefreshCw, Link2, Check, X, Download } from "lucide-react";
+import { exportCsv } from "@/lib/utils";
 
 export default function HalaqatPage() {
   const [halaqat, setHalaqat] = useState<Halqa[]>([]);
@@ -94,6 +95,40 @@ export default function HalaqatPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportCsv(
+                filtered.map((h) => ({
+                  code:     h.halqa_code,
+                  track:    h.track ?? "—",
+                  teacher:  h.teacher_name ?? "—",
+                  emp_no:   h.teacher_emp_no ?? "—",
+                  period:   h.period ?? "—",
+                  type:     h.circle_type ?? "—",
+                  status:   h.status ?? "—",
+                  enjazi:   h.enjazi_id ?? "—",
+                })),
+                [
+                  { key: "code",    label: "الرمز" },
+                  { key: "track",   label: "المسار" },
+                  { key: "teacher", label: "المعلّم" },
+                  { key: "emp_no",  label: "رقم المعلّم" },
+                  { key: "period",  label: "الفترة" },
+                  { key: "type",    label: "النوع" },
+                  { key: "status",  label: "الحالة" },
+                  { key: "enjazi",  label: "رقم إنجازي" },
+                ],
+                `halaqat_${new Date().toISOString().slice(0, 10)}`
+              )
+            }
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1"
+          >
+            <Download size={14} />
+            تصدير CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}
             className="flex items-center gap-1">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
