@@ -19,6 +19,7 @@
 """
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -50,6 +51,11 @@ LEVEL_ID = 1744
 
 MAX_ATTEMPTS = 3          # بعدها يبقى الصف failed حتى تُعيد تعيينه يدويًا من صفحة الإحصائيات
 DEFAULT_BATCH = 25        # صفوف لكل دورة عامل
+
+# تسجيل الطالب في إنجازي غير متزامن: batch_register يرجع مهمة "queued" ثم يُنشأ الطالب بعد
+# ثوانٍ. لذا نستطلع وجوده بعد الإرسال (check_username خفيف) بدل افتراض النجاح فورًا.
+REGISTER_POLL_ATTEMPTS = 3     # محاولات استطلاع داخل نفس الدورة
+REGISTER_POLL_DELAY = 2.0      # ثوانٍ بين المحاولات (إضافةً لتأخير محدّد المعدل)
 
 _ROW_SELECT = (
     "id,recite_date,sync_status,sync_attempts,"
@@ -146,8 +152,35 @@ class _Session:
             logger.info(f"recite_sync: خريطة الحلقات جاهزة ({len(m)} طالب)")
         return self._episode_map
 
+    def lookup_enjazi_id(self, nid: str) -> int | None:
+        """فحص خفيف (check_username): يعيد enjazi_id إن كان الطالب موجودًا في المنشأة، وإلا None."""
+        try:
+            resp = self.stu_api.check_username(nid, self.institution_id)
+        except Exception as exc:
+            logger.debug(f"check_username({nid}) فشل: {exc}")
+            return None
+        data = (resp or {}).get("data") or {}
+        if data.get("code") == "already_exists":
+            uid = (data.get("user") or {}).get("id")
+            return int(uid) if uid else None
+        return None
+
+    def _save_enjazi_id(self, sb, student_row_id, enjazi_id: int) -> None:
+        """يكتب enjazi_id في Supabase ويحدّث خريطة الحلقات ليجد التسميعُ حلقةَ الطالب."""
+        sb.table("students").update({"enjazi_id": enjazi_id}).eq("id", student_row_id).execute()
+        self.episode_map(refresh=True)
+
     def register_student(self, sb, row: dict) -> int | None:
-        """يسجّل طالبًا غير موجود في إنجازي ثم يعيد enjazi_id ويكتبه في Supabase."""
+        """
+        يضمن وجود الطالب في إنجازي ويعيد enjazi_id (يكتبه في Supabase).
+
+        التسجيل في إنجازي **غير متزامن**: batch_register يرجع مهمة queued والطالب يُنشأ بعد
+        ثوانٍ. لذا:
+          (أ) نفحص أولًا إن كان موجودًا مسبقًا (مهمة دورة سابقة اكتملت) فنتبنّاه بلا إعادة إرسال
+              — يمنع التسجيلات المكرّرة.
+          (ب) نرسل طلب التسجيل.
+          (ج) نستطلع ظهوره داخل الدورة؛ فإن لم يظهر نعيد None (سيُتبنّى في دورة لاحقة عبر (أ)).
+        """
         stu = row["students"]
         hal = row["halaqat"]
         nid = str(stu.get("student_national_id") or "").strip()
@@ -156,6 +189,14 @@ class _Session:
         if not nid or not episode_id:
             return None
 
+        # (أ) موجود مسبقًا؟ تبنّاه بلا إعادة تسجيل
+        enjazi_id = self.lookup_enjazi_id(nid)
+        if enjazi_id:
+            self._save_enjazi_id(sb, stu["id"], enjazi_id)
+            logger.info(f"[{name}] موجود في إنجازي (enjazi_id={enjazi_id}) — تبنٍّ بلا تسجيل جديد")
+            return enjazi_id
+
+        # (ب) أرسل طلب التسجيل (غير متزامن: مهمة queued)
         payload = [{
             "id": 0,
             "name": name,
@@ -167,18 +208,21 @@ class _Session:
             "original_username": nid,
         }]
         self.stu_api.batch_register(payload, self.institution_id)
-        logger.info(f"[{name}] سُجِّل في إنجازي (حلقة {episode_id})")
+        logger.info(f"[{name}] أُرسل طلب تسجيل إلى إنجازي (حلقة {episode_id}) — بانتظار المعالجة")
 
-        # استخراج enjazi_id الجديد بمطابقة رقم الهوية (username) ثم كتابته في Supabase
-        enjazi_id = None
-        for s in self.stu_api.list_by_institution(self.institution_id, limit=5000):
-            if str(s.get("username") or "").strip() == nid:
-                enjazi_id = int(s["id"])
-                break
-        if enjazi_id:
-            sb.table("students").update({"enjazi_id": enjazi_id}).eq("id", stu["id"]).execute()
-            self.episode_map(refresh=True)
-        return enjazi_id
+        # (ج) استطلاع حتى تكتمل المهمة الخلفية ويظهر الطالب
+        for i in range(REGISTER_POLL_ATTEMPTS):
+            time.sleep(REGISTER_POLL_DELAY)
+            enjazi_id = self.lookup_enjazi_id(nid)
+            if enjazi_id:
+                self._save_enjazi_id(sb, stu["id"], enjazi_id)
+                logger.info(f"[{name}] سُجِّل في إنجازي (enjazi_id={enjazi_id}) — محاولة {i + 1}")
+                return enjazi_id
+
+        logger.warning(
+            f"[{name}] طلب التسجيل قيد المعالجة في إنجازي — لم يظهر بعد؛ سيُتبنّى في دورة لاحقة"
+        )
+        return None
 
     def ensure_episode_open(self, eid: int) -> None:
         """يفتح الحلقة إن كانت مقفلة اليوم (بتحضير أول طالب فيها) — مرة واحدة لكل دورة."""
@@ -216,8 +260,17 @@ def _process_row(s: _Session, sb, row: dict, result: dict, dry_run: bool) -> Non
             return
         sid = s.register_student(sb, row)
         if not sid:
-            _mark(sb, row["id"], "failed", "تعذّر تسجيل الطالب في إنجازي", attempts + 1)
-            result["failed"] += 1
+            # التسجيل غير متزامن: None يعني «قيد المعالجة، لم يظهر بعد» لا فشلًا نهائيًا.
+            # نُبقيه pending ليُعاد التقاطه (وتتبنّاه دورةٌ لاحقة)، حتى نفاد المحاولات فيصير failed.
+            n = attempts + 1
+            if n >= MAX_ATTEMPTS:
+                _mark(sb, row["id"], "failed",
+                      "تعذّر تسجيل الطالب في إنجازي (لم يكتمل بعد عدة محاولات)", n)
+                result["failed"] += 1
+            else:
+                _mark(sb, row["id"], "pending",
+                      "طلب التسجيل قيد المعالجة في إنجازي — سيُعاد", n)
+                result["register_pending"] = result.get("register_pending", 0) + 1
             return
         result["registered"] += 1
     sid = int(sid)
@@ -373,6 +426,7 @@ def process_pending(limit: int = DEFAULT_BATCH, dry_run: bool = False) -> dict:
         "synced": 0,
         "pillars_recited": 0,
         "registered": 0,
+        "register_pending": 0,   # طلب تسجيل غير متزامن لم يكتمل بعد (يُعاد في دورة لاحقة)
         "attended": 0,
         "skipped_no_halqa_link": 0,
         "skipped_no_episode": 0,
@@ -408,7 +462,8 @@ def process_pending(limit: int = DEFAULT_BATCH, dry_run: bool = False) -> dict:
 
     logger.info(
         f"recite_sync: مُزامَن={result['synced']} أركان={result['pillars_recited']} "
-        f"مسجَّلون={result['registered']} حُضِّروا={result['attended']} فشل={result['failed']}"
+        f"مسجَّلون={result['registered']} تسجيل-معلّق={result['register_pending']} "
+        f"حُضِّروا={result['attended']} فشل={result['failed']}"
     )
     return result
 
